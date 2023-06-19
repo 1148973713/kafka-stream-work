@@ -1,6 +1,7 @@
 package com.kafka.stream.work.handler;
 
 import com.kafka.stream.work.entity.FacilityEntity;
+import com.kafka.stream.work.processor.HandlerProcessor;
 import com.kafka.stream.work.serde.StreamsSerde;
 import com.kafka.stream.work.vo.FacilityVo;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -10,12 +11,14 @@ import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.processor.UsePartitionTimeOnInvalidTimestamp;
 import org.apache.kafka.streams.processor.WallclockTimestampExtractor;
-import org.apache.kafka.streams.state.WindowStore;
+import org.apache.kafka.streams.state.*;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.time.Duration;
 import java.util.Properties;
+
+import static org.apache.kafka.streams.StoreQueryParameters.fromNameAndType;
 
 /**
  * @author wuk
@@ -55,7 +58,8 @@ public class HandlerApplication {
         //Consumed.wit中序列化与反序列化要与实际“standard-facility”topic主题传的数据格式一致
         KTable<Windowed<String>, Long> standardCount = builder.stream("standard-facility", Consumed.with(stringSerde, facilityEntitySerde).withOffsetResetPolicy(Topology.AutoOffsetReset.LATEST))
                 .groupBy((key, value) -> key, Grouped.with("standard-facility-window", stringSerde, facilityEntitySerde))
-                .windowedBy(TimeWindows.of(windowSize).advanceBy(advanceBy)).count(Materialized.<String, Long, WindowStore<Bytes, byte[]>>as("StandardCount"));
+                .windowedBy(TimeWindows.of(windowSize).advanceBy(advanceBy))
+                .count(Materialized.<String, Long, WindowStore<Bytes, byte[]>>as("StandardCount"));
 
         //开窗获取”“standard-facility"”
 //        KTable<Windowed<FacilityEntity>, Long> outOfStandardCount = builder.stream("out-of-standard-facility", Consumed.with(stringSerde,StreamsSerde.FacilitySerde()).withOffsetResetPolicy(Topology.AutoOffsetReset.EARLIEST))
@@ -91,7 +95,18 @@ public class HandlerApplication {
         System.out.println("Starting CountingWindowing and KTableJoins Example");
         kafkaStreams.cleanUp();
         kafkaStreams.start();
-        Thread.sleep(60000);
+        Thread.sleep(30000);
+        //设置交互式查询
+        System.out.println("Query has ready,Please read message on the console");
+        //因为前面用的是窗口存储，所以此处也要使用窗口类型
+        ReadOnlyWindowStore<String, Long> standardStore = kafkaStreams.store(fromNameAndType("StandardCount", QueryableStoreTypes.windowStore()));
+        KeyValueIterator<Windowed<String>, Long> range = standardStore.all();
+        while (range.hasNext()) {
+            System.out.println("thread has start,Please read message on the console");
+            KeyValue<Windowed<String>, Long> next = range.next();
+            //原键格式是：数据键+时间戳，我们现只获取数据键
+            System.out.println("Count for" + next.key.key() + ":" + next.value);
+        }
         System.out.println("Shutting down the CountingWindowing and KTableJoins Example Application now");
         kafkaStreams.close();
     }

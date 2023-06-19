@@ -33,7 +33,7 @@ public class KafkaProducerExample {
         // 创建生产者实例
         Producer<String, String> producer = new KafkaProducer<>(props);
 
-        for (int i = 2030; i <= 2050; i++) {
+        for (int i = 7030; i <= 7050; i++) {
             // 构建要发送的消息记录
             String topic = "facility-messages";
             String key = String.valueOf(i);

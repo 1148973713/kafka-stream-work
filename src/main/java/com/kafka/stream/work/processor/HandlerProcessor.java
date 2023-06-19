@@ -1,4 +1,4 @@
-package com.kafka.stream.work.handler;
+package com.kafka.stream.work.processor;
 
 import com.alibaba.fastjson.JSON;
 import com.kafka.stream.work.entity.FacilityEntity;
